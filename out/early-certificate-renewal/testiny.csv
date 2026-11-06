@@ -1,0 +1,210 @@
+parent_folder_name,title,template,precondition,steps,expected_results,priority,testcase_type,automation
+Early renewal > Single,TC-01 Early renewal of a single certificate by an authorized operator (AC-1),STEPS,"- A managed certificate on profile Web-Prod whose renewal period has not started (today is before notAfter minus the profile renewal period).
+- Renewal is enabled on the profile.
+- An RA Operator account holds the early-renewal capability [A: name of the right or permission].
+- The certificate has labels, an owner and several SAN entries.
+","[1] As the RA Operator, search the certificate in the certificate inventory and open its details
+
+[2] Click Renew [A: label of the early-renewal action]
+
+[3] Confirm the early renewal
+
+[4] If the profile requires approval, approve the request as the approver [A: depends on the enforcement model, see TC-08]
+
+[5] Open the new certificate
+
+[6] Open the previous certificate
+","[1] The details page shows the certificate as valid, with its expiry date and the profile; the renewal period has not started
+
+[2] A confirmation dialog states that the renewal is outside the renewal period and asks to confirm [A: exact wording]
+
+[3] The request is created without the error WEBRA-RENEW-005 (Certificate not in its renewal period)
+
+[4] The request reaches the completed state
+
+[5] It is issued on profile Web-Prod and the same PKI connector; DN, SAN, extensions, labels, owner and metadata are identical to the previous certificate; only the key may differ
+
+[6] It follows the standard renew handling of the profile (for example revocation or retention as configured)
+",1,FUNCTIONAL,NOT_AUTOMATED
+Early renewal > Single,TC-02 Third-party technical metadata is kept on the renewed certificate (AC-1),STEPS,"- A third-party connector is configured and the certificate was deployed through it, with technical data such as an F5 partition Common/prod [A: use a test connector or a stub].
+- The certificate is outside its renewal period.
+- The operator holds the early-renewal capability.
+","[1] Open the certificate details and note the third-party data (connector name, partition or target)
+
+[2] Renew the certificate early
+
+[3] Open the renewed certificate and compare its third-party data
+
+[4] Run the redeployment of the renewed certificate through the connector
+","[1] The third-party data of the connector is displayed [A: where it appears in the UI and in the API response]
+
+[2] The request succeeds
+
+[3] The connector and the technical data are identical (same partition Common/prod)
+
+[4] It is deployed to the same location as the previous certificate
+",1,FUNCTIONAL,NOT_AUTOMATED
+Early renewal > API,"TC-03 Early renewal through the REST API, single and multiple (FR-5, ACT-1)",STEPS,"- A Service principal with an API token holding the early-renewal capability.
+- Three managed certificates outside their renewal period on the same profile.
+","[1] Call the renew endpoint for one certificate without the early-renewal indicator
+
+[2] Call the renew endpoint for the same certificate with the early-renewal indicator [A: name and location of the indicator]
+
+[3] Call the renew endpoint for the two other certificates in one call with the indicator [A: format of the multiple call]
+
+[4] Check the resulting certificates in the inventory
+","[1] The request is rejected with WEBRA-RENEW-005, as before the change
+
+[2] The request is accepted and a renewal request is created for that certificate
+
+[3] One result per certificate is returned [A: structure of the response]; both renewals are created
+
+[4] Three new certificates exist on the same profile and connector
+",1,FUNCTIONAL,NOT_AUTOMATED
+Early renewal > Bulk,"TC-04 Bulk early renewal with a partial failure, from inventory and My Certificates (AC-2)",STEPS,"- Ten managed certificates on profile Web-Prod: eight valid outside their renewal period, one revoked, one expired.
+- An RA Operator who owns them or can manage them, with the early-renewal capability.
+","[1] In the certificate inventory (RA), select the ten certificates with the checkboxes, as for a bulk revocation
+
+[2] Click Renew and confirm the early renewal
+
+[3] Read the outcome of the operation
+
+[4] Check that the eight new certificates still exist after the rejections
+
+[5] Repeat the operation on four other eligible certificates from My Certificates
+","[1] The selection counter shows 10 and a Renew action is available [A: position of the bulk Renew action]
+
+[2] The confirmation states the renewal is outside the renewal period; processing starts
+
+[3] Eight certificates are renewed; the revoked and the expired certificates are rejected with a per-certificate reason based on status or validity [A: report format and wording]
+
+[4] None of the successful renewals has been rolled back
+
+[5] The same bulk renewal is available and works in My Certificates
+",1,FUNCTIONAL,NOT_AUTOMATED
+Early renewal > Eligibility,TC-05 Validity and status checks still apply to early renewal (AC-4),STEPS,"- An authorized operator.
+- A revoked certificate, an expired certificate and a certificate on a profile where renewal is not enabled, all outside any renewal period.
+","[1] Try an early renewal of the revoked certificate
+
+[2] Try an early renewal of the expired certificate
+
+[3] Try an early renewal of the certificate on the profile without renewal enabled
+
+[4] Check the three certificates
+","[1] Rejected because of its status; the error is not WEBRA-RENEW-005
+
+[2] Rejected because of its validity; the error is not WEBRA-RENEW-005
+
+[3] Rejected because renewal is not enabled on the profile
+
+[4] None of them was renewed and no new request exists
+",1,FUNCTIONAL,NOT_AUTOMATED
+Early renewal > Authorization,TC-06 Users without the capability cannot renew outside the window (AC-3),STEPS,"- A managed certificate outside its renewal period, owned by an end user.
+- The end user can renew in window.
+- A privileged user without the early-renewal capability.
+","[1] As the end user, open My Certificates and look at the renew action of the certificate
+
+[2] As the end user, call the renew API for this certificate
+
+[3] As the privileged user without the capability, try the early renewal from the UI and the API
+
+[4] Grant the capability to the privileged user and retry
+","[1] No early-renewal action is offered in self-service [A: Renew hidden, disabled or showing the period error]
+
+[2] Rejected; the certificate is not renewed [A: error code, WEBRA-RENEW-005 or an authorization error]
+
+[3] Rejected; the certificate is not renewed
+
+[4] The early renewal is accepted
+",1,SECURITY,NOT_AUTOMATED
+Early renewal > Regression,"TC-07 Standard renewals are unchanged (NFR-1, NFR-4, FR-8)",STEPS,"- A certificate inside its renewal period owned by an end user.
+- A certificate outside its period.
+- A certificate linked to an automation policy (metadata AUTOMATION_POLICY).
+- Access to the Horizon configuration.
+","[1] As the end user, renew the certificate inside its renewal period
+
+[2] Let the automatic renewal run on the certificate outside its period
+
+[3] Renew the automation-policy certificate outside its period with the existing automation bypass
+
+[4] Look for a new global setting in the configuration and in the HOCON files
+","[1] The renewal succeeds without any early-renewal confirmation
+
+[2] The certificate is not renewed automatically before its period
+
+[3] Behaviour identical to the previous version
+
+[4] No new toggle or HOCON key exists; early renewal is only a per-request action
+",1,REGRESSION,NOT_AUTOMATED
+Early renewal > Authorization,"TC-08 Approval workflow for early renewal (ACT-3, FR-8)",STEPS,"- [A: the enforcement model is not decided, see Technical Open Question 1] Profile whose renew workflow requires approval.
+- An operator who requests early renewals and an RA Operator approver.
+- Three certificates outside their renewal period.
+","[1] As the operator, request an early renewal of one certificate
+
+[2] As the approver, approve the request
+
+[3] Request another early renewal and deny it as the approver
+
+[4] As the operator, request a bulk early renewal of the three certificates
+","[1] A request waits for approval and the certificate is not renewed yet [A: depends on the model chosen]
+
+[2] The certificate is renewed
+
+[3] The certificate is not renewed
+
+[4] [A: one request per certificate, or one global request] Each certificate follows the approval workflow independently
+",2,FUNCTIONAL,NOT_AUTOMATED
+Early renewal > Audit,TC-09 Audit event identifies renewals outside the renewal period (AC-5),STEPS,"- Access to the audit events as a Business administrator.
+- One early renewal and one in-window renewal performed.
+","[1] Open the audit events and filter on LIFECYCLE-RENEW
+
+[2] Open the event of the early renewal
+
+[3] Open the event of the in-window renewal
+
+[4] Check bulk renewals
+","[1] Both events are listed
+
+[2] It indicates the renewal occurred outside the renewal period [A: field name or flag] and identifies the operator
+
+[3] It does not carry the out-of-period indication
+
+[4] Each certificate of a bulk early renewal has its own LIFECYCLE-RENEW event with the indication
+",1,FUNCTIONAL,NOT_AUTOMATED
+Early renewal > Authorization,TC-10 Tenant isolation of early renewal (NFR-3),STEPS,"- Two tenants A and B, a managed certificate outside its period in tenant B, an operator with the capability in tenant A, and a root tenant administrator.
+","[1] As the tenant A operator, try to renew the tenant B certificate through the API with the early-renewal indicator
+
+[2] As the tenant A operator, search the tenant B certificate in the UI
+
+[3] As the root tenant administrator, open the certificate of tenant A
+","[1] Rejected as not found or forbidden; no request is created
+
+[2] It is not visible
+
+[3] The early-renewal action is visible, as for other lifecycle actions
+",2,SECURITY,NOT_AUTOMATED
+Early renewal > Bulk,"TC-11 Bulk early renewal of several hundred certificates (NFR-2, FR-6)",STEPS,"- [A: seed of 300 managed certificates outside their period, created by a seed script] An operator with the capability.
+","[1] Select the 300 certificates in the inventory and start a bulk early renewal
+
+[2] Follow the progress and wait for the end
+
+[3] Search the new certificates
+","[1] The screen stays usable; the operation runs asynchronously [A: progress indicator]
+
+[2] All certificates reach a final outcome; the report lists each outcome [A: expected duration threshold, not defined in the spec]
+
+[3] All eligible certificates were renewed, none is duplicated
+",3,PERFORMANCE,NOT_AUTOMATED
+Early renewal > Single,"TC-12 Connector migration: repoint the profile then renew early (FR-2, FR-1)",STEPS,"- Profile Web-Prod pointing to PKI connector A, with two certificates outside their period.
+- A second PKI connector B available.
+","[1] Repoint profile Web-Prod to connector B
+
+[2] Renew one certificate early
+
+[3] Look in the renewal UI and API for an option to choose another profile or connector
+","[1] The profile is saved with connector B
+
+[2] The new certificate is issued by connector B, on profile Web-Prod; the metadata PKI_CONNECTOR shows connector B
+
+[3] None is offered; the renewal always uses the current profile and connector
+",2,FUNCTIONAL,NOT_AUTOMATED

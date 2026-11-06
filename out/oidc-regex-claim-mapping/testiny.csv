@@ -1,0 +1,200 @@
+parent_folder_name,title,template,precondition,steps,expected_results,priority,testcase_type,automation
+OIDC claim mapping > Resolution,"TC-01 Regex entry grants Team to matching subgroups, including a new one (AC-1)",STEPS,"- OIDC provider with Regex entry app-team-.* mapped to Team X, mode roles_teams.
+- Three test users in the IdP, in groups app-team-frontend, app-team-backend and none of them yet in app-team-security.
+","[1] Log in as the user in group app-team-frontend
+
+[2] Log in as the user in group app-team-backend
+
+[3] On the IdP, create group app-team-security, add the third user, then log in without changing anything in Horizon
+","[1] Login succeeds; the user is a member of Team X
+
+[2] The user is a member of Team X
+
+[3] The user is a member of Team X
+",1,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Resolution,"TC-02 Matching rules: whole value, case sensitivity, inline flag (AC-4)",STEPS,"- Regex entries: team-.* -> Team Y, App-Team-.* -> Team X, (?i)ops-.* -> Team Z, app-team -> Team W.
+- One test user per claim value below.
+","[1] Log in with claim value x-team-frontend
+
+[2] Log in with claim value team-frontend
+
+[3] Log in with claim value app-team-frontend
+
+[4] Log in with claim value App-Team-frontend
+
+[5] Log in with claim value OPS-Frontend
+","[1] Team Y is not granted (no substring match)
+
+[2] Team Y is granted
+
+[3] Team X is not granted (case-sensitive) and Team W is not granted (trailing characters)
+
+[4] Team X is granted
+
+[5] Team Z is granted (inline flag (?i))
+",1,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Resolution,"TC-03 Static and Regex entries coexist, union of Roles and Teams (AC-3)",STEPS,"- Static entry admin -> Role A.
+- Regex entries admin.* -> Role B and .*-backend -> Team Y.
+- Static entry app-.* -> Team Z (regex characters must be literal).
+","[1] Log in with claim value admin
+
+[2] Log in with claim value admin2
+
+[3] Log in with claim values admin and app-backend
+
+[4] Log in with claim value app-frontend, then with the literal value app-.*
+
+[5] Log in with claim value marketing
+","[1] The user holds Role A and Role B
+
+[2] The user holds Role B only (static entry is an exact match)
+
+[3] The user holds Role A, Role B and Team Y (union across entries)
+
+[4] Team Z is not granted for app-frontend (static, literal); Team Z is granted for the literal value
+
+[5] No Role or Team is granted by the mapping
+",1,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Validation,TC-04 Invalid regex is rejected on save (UI and API) (AC-2),STEPS,"- OIDC provider edit page open, valid configuration saved beforehand.
+- API credentials of a Business administrator.
+","[1] In the UI, add a Regex entry with value app-team-[ and Team X, then save
+
+[2] Reload the provider
+
+[3] Add a valid Regex entry app-team-.* then an invalid one (admin (second entry), and save
+
+[4] Send the same invalid pattern through the provider update API
+
+[5] Add a Regex entry with an empty value and save [needs clarification]
+","[1] Save is blocked with an error that names the offending entry
+
+[2] The invalid entry is not persisted; the previous configuration is unchanged
+
+[3] The error designates the second entry, not the first
+
+[4] Request is rejected with a client error naming the entry; configuration unchanged
+
+[5] Behaviour to be defined: rejection or acceptance (Open Question 2)
+",1,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Validation,TC-05 Reference rules on Roles and Teams still apply to Regex entries (FR-7),STEPS,"- API credentials of a Business administrator.
+- Role ghost-role and Team ghost-team do not exist.
+- Role A and Team X exist.
+","[1] Update the provider with Regex entry app-.* targeting ghost-role
+
+[2] Update the provider with Regex entry app-.* targeting ghost-team
+
+[3] Update the provider with Regex entry app-.* with neither Role nor Team
+
+[4] Set mode roles and add a Regex entry targeting Team X
+
+[5] Save a valid Regex entry app-.* -> Role A and Team X, then try to delete Role A and Team X
+","[1] Rejected: Role(s) referenced in claim mapping do not exist
+
+[2] Rejected: Team(s) referenced in claim mapping do not exist
+
+[3] Rejected: an entry must contain at least one role or team
+
+[4] Rejected: entries must not reference teams when the mode is roles
+
+[5] Both deletions are refused because they are referenced by the OIDC claim mapping
+",2,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > UI,"TC-06 Match type control in the UI (FR-1, NFR-4, FR-3)",STEPS,"- Business administrator logged in, expert mode disabled, OIDC provider edit page open with one Static entry app-team-.* -> Team X.
+","[1] Add a new claim mapping entry
+
+[2] Select Regex on the new entry
+
+[3] Save, reload the page
+
+[4] Switch the first entry from Static to Regex, save, and log in with app-team-frontend
+","[1] Match type is preselected to Static; the control is visible outside expert mode
+
+[2] Helper text explains the value is a regular expression and shows an example such as app-team-.*
+
+[3] The entry keeps the Regex match type and its value
+
+[4] Team X is granted; with the entry set back to Static, it is not
+",2,USABILITY,NOT_AUTOMATED
+OIDC claim mapping > Synchronization mode,"TC-07 Synchronization modes apply to Regex entries (NFR-5, FR-2)",STEPS,"- Regex entry app-.* -> Role A and Team X.
+- Test user already holding Role B and Team Z (set manually).
+","[1] Set mode roles, log in with claim app-frontend
+
+[2] Set mode teams, log in with the same claim
+
+[3] Set mode roles_teams, log in with the same claim, then remove the user from the IdP group and log in again
+","[1] Role A granted; Team X not granted; Team Z kept
+
+[2] Team X granted; Role B kept
+
+[3] After the first login the user has Role A and Team X; after the second the mapped Roles and Teams are removed (Replace)
+",1,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Upgrade,"TC-08 Existing mappings unchanged after upgrade, and old exports import as Static (AC-5)",STEPS,"- Horizon 2.10 or 2.11 with exact-match entries (admin -> Role A, finance -> Team Y) and a configuration export from that version, then upgrade to 2.12.0.
+","[1] After the upgrade, open the claim mapping
+
+[2] Log in with claims admin and finance
+
+[3] Import the old configuration export into a clean 2.12.0 tenant
+","[1] Every existing entry shows Match type Static; values and targets unchanged
+
+[2] Role A and Team Y are granted exactly as before the upgrade
+
+[3] Import succeeds; all entries are Static
+",1,REGRESSION,NOT_AUTOMATED
+OIDC claim mapping > Import-Export,TC-09 Configuration export and import preserve Regex entries (FR-8),STEPS,"- Provider with one Static and one Regex entry (app-team-.* -> Team X).
+- A clean target tenant.
+","[1] Export the configuration
+
+[2] Import the export into the clean tenant
+
+[3] Open the provider and log in with app-team-frontend
+","[1] The OIDC Identity Provider contains the match type of both entries, Regex marked as such
+
+[2] Import succeeds
+
+[3] The Regex entry is present and effective; Team X is granted
+",1,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Permissions,TC-10 Access control on claim mapping configuration (ACT-1),STEPS,"- One user with the Identity Provider management permission, one without.
+","[1] As the authorized user, add and save a Regex entry (UI)
+
+[2] As the other user, open the identity provider page and send an update with a Regex entry via the API
+
+[3] Compare the permission list with 2.11
+","[1] Save succeeds
+
+[2] Edition is not possible in the UI; the API refuses the request
+
+[3] No permission related to claim mapping or regex has been added
+",1,SECURITY,NOT_AUTOMATED
+OIDC claim mapping > Audit,TC-11 Audit event on save (NFR-3),STEPS,"- Access to the audit events.
+","[1] Save the provider with a Regex entry
+
+[2] Look for any new event type tied to the action
+","[1] One SEC-IDENTITY-PROVIDER-UPDATE event is recorded
+
+[2] No new event type exists
+",2,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Tenants,TC-12 Claim mapping is isolated per tenant (NFR-4),STEPS,"- Two tenants; tenant A has Regex entry app-.* -> Team X, tenant B has none.
+","[1] As root tenant administrator, open the provider of each tenant
+
+[2] Log in on tenant B with claim app-frontend
+","[1] Each tenant shows only its own entries
+
+[2] Team X is not granted
+",2,FUNCTIONAL,NOT_AUTOMATED
+OIDC claim mapping > Out of scope regression,TC-13 Service Accounts and Local provider unaffected (FR-3),STEPS,"- OIDC provider with Service Account claim rules as in 2.11 plus a Regex entry.
+- A local user with Roles and Teams.
+","[1] Authenticate a Service Account that satisfies the claim rules, then one that does not
+
+[2] Log in with the local user
+","[1] Accepted and refused exactly as in 2.11
+
+[2] Roles and Teams are those of the local user, unchanged
+",2,REGRESSION,NOT_AUTOMATED
+OIDC claim mapping > Performance,TC-14 Pathological regex and many entries do not degrade login (NFR-2),STEPS,"- Regex entry (a+)+$ saved (acceptance by validation is itself unspecified).
+- A provider variant with 100 Regex entries and a user with 50 group values.
+","[1] Log in with a claim of 40 characters a followed by !
+
+[2] Measure login time on the 100-entry provider, and compare with 100 Static entries
+","[1] Login ends within a bounded time and the server stays responsive; exact limit to define (Open Question 1)
+
+[2] The difference is acceptable; threshold to be defined by the team
+",3,PERFORMANCE,NOT_AUTOMATED

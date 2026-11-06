@@ -1,0 +1,32 @@
+Exigence,Type,Enonce,Source spec,Derive de,Tests,Nb tests,Priorite max,Code,Couverture
+US-1,US,"As a Business administrator, I want to match OIDC claim values with a regular expression in a mapping entry, so that one rule covers all matching subgroups.",User Stories,,"TC-01, TC-02, TC-03, TC-07",4,,,"Couverte via FR-2, FR-4, FR-5"
+US-2,US,"As a Business administrator, I want to choose Static or Regex per entry, so that existing exact-match mappings keep working unchanged.",User Stories,,"TC-03, TC-05, TC-06, TC-08, TC-09, TC-13",6,,,"Couverte via FR-1, FR-3, FR-7, FR-8"
+US-3,US,"As a Business administrator, I want an invalid regex rejected when I save, so that a broken pattern never silently denies or over-grants access.",User Stories,,TC-04,1,,,Couverte via FR-6
+US-4,US,"As an End user, I want my Roles and Teams resolved correctly from my group claims at login, so that a new subgroup gives the right access with no admin action.",User Stories,,"TC-01, TC-02, TC-03, TC-07",4,,,Couverte via FR-2
+FR-1,FR,A Business administrator can set each claim mapping entry's match type to Static or Regex; a new entry defaults to Static.,Functional Requirements,US-2,TC-06,1,P2,"horizon-ui/src/components/horizonConf/common/identityProviders/ClaimMapping.vue:75
+horizon/app/models/security/identity/provider/oidc/ClaimMappingEntry.scala:9",Couverte
+FR-2,FR,"For a Regex entry, Horizon grants the entry's Roles and Teams when an extracted claim value matches the pattern over its whole length.",Functional Requirements,"US-1, US-4","TC-01, TC-02, TC-03, TC-07",4,P1,horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22,Couverte
+FR-3,FR,"A Static entry keeps matching by exact string equality, unchanged.",Functional Requirements,US-2,"TC-03, TC-06, TC-08, TC-13",4,P1,"horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22
+horizon/test/security/OidcClaimMappingSpec.scala:19",Couverte
+FR-4,FR,"When a claim value matches several entries, Horizon grants the union of all matched entries' Roles and Teams.",Functional Requirements,US-1,TC-03,1,P1,"horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:23
+horizon/test/security/OidcClaimMappingSpec.scala:28",Couverte
+FR-5,FR,Regex matching is case-sensitive; case-insensitive matching is expressed with inline regex flags.,Functional Requirements,US-1,TC-02,1,P1,horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22,Couverte
+FR-6,FR,Horizon validates a Regex entry's pattern when the OIDC provider is saved and rejects the save with a clear error naming the offending entry.,Functional Requirements,US-3,TC-04,1,P1,"horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:147
+horizon/app/models/security/identity/provider/codec/DynamicIdentityProviderCodec.scala:37",Couverte
+FR-7,FR,"A Regex entry references only existing Roles and Teams, validated at save time as today.",Functional Requirements,US-2,TC-05,1,P2,"horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:170
+horizon/test/security/OidcIdentityProviderSpec.scala",Couverte
+FR-8,FR,The extended claim mapping is included in configuration import / export.,Functional Requirements,US-2,"TC-08, TC-09",2,P1,"horizon/app/models/configuration/ExportableItems.scala:198
+horizon/app/models/security/identity/provider/codec/DynamicIdentityProviderCodec.scala:36",Couverte
+AC-1,AC,Regex entry app-team-.* mapped to Team X; login with app-team-frontend and app-team-backend grants Team X.,Acceptance Criteria,FR-2,TC-01,1,P1,horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22,Couverte
+AC-2,AC,Invalid pattern app-team-[ is rejected on save with an error naming the entry; mapping not persisted.,Acceptance Criteria,FR-6,TC-04,1,P1,horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:147,Couverte
+AC-3,AC,Static entry admin -> Role A and Regex entry admin.* -> Role B; login with admin grants both roles.,Acceptance Criteria,FR-4,TC-03,1,P1,horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22,Couverte
+AC-4,AC,"Regex entry team-.* mapped to Team Y; value x-team-frontend does not match, Team Y not granted.",Acceptance Criteria,FR-2,TC-02,1,P1,horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22,Couverte
+AC-5,AC,Mapping saved before upgrade with exact-match entries: after upgrade every entry is Static and resolution is identical to 2.10.,Acceptance Criteria,FR-3,TC-08,1,P1,horizon/test/security/ClaimMappingEntrySpec.scala,Couverte
+ACT-1,ACT,"Configuring the OIDC provider claim mapping, including regex entries, is permitted to the Business administrator using the existing Identity Provider management permission; no new permission.","UX / UI, Roles & permissions",,TC-10,1,P1,horizon/app/controllers/security/openid/OpenIdController.scala:144,Couverte
+NFR-1,NFR,"Backward compatibility: stored mappings load unchanged, every existing entry is Static, no data migration beyond defaulting.",Non-Functional Requirements,,TC-08,1,P1,"horizon/app/models/security/identity/provider/oidc/ClaimMappingEntry.scala:9
+horizon/packaging/migration",Couverte
+NFR-2,NFR,"Regex evaluation must be safe against pathological input (ReDoS guard, approach still an open question).",Non-Functional Requirements; Technical Open Questions #1,,TC-14,1,P3,horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22,Couverte
+NFR-3,NFR,Saving the provider emits the existing audit event SEC-IDENTITY-PROVIDER-UPDATE; no new event type.,Non-Functional Requirements,,TC-11,1,P2,horizon/app/models/event/EventCode.scala:629,Couverte
+NFR-4,NFR,Mapping is stored per tenant in the identity providers configuration; the Match type control is not expert-mode only.,Non-Functional Requirements; UX / UI,,"TC-06, TC-12",2,P2,horizon-ui/src/pages/horizonConf/security/accessMgmt/identityProviders/AddEditIdentityProvider.vue,Couverte
+NFR-5,NFR,"Existing synchronization modes (roles_teams, roles, teams) keep their semantics with Regex entries (not in the spec, present in the code).","Code: OidcClaimMapping.scala, OidcIdentityProvider.scala",,TC-07,1,P1,"horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:24
+horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:160",Couverte

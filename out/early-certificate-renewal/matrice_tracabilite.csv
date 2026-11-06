@@ -1,0 +1,37 @@
+Exigence,Type,Enonce,Source spec,Derive de,Tests,Nb tests,Priorite max,Code,Couverture
+US-1,US,"As an RA Operator, I want to renew a managed certificate before its renewal period opens, so that I can respond to a mass-revocation event without waiting for each certificate's window.",User Stories,,"TC-01, TC-05, TC-12",3,,,"Couverte via FR-1, FR-2, FR-7"
+US-2,US,"As an RA Operator, I want to select several certificates in the certificate inventory and renew them in one action, so that I can reissue hundreds of certificates quickly.",User Stories,,"TC-04, TC-11",2,,,"Couverte via FR-4, FR-6"
+US-3,US,"As a Service principal, I want to trigger early renewal through the REST API, so that I can script a CA migration.",User Stories,,TC-03,1,,,Couverte via FR-5
+US-4,US,"As a Business administrator, I want early renewal restricted to authorized operators and recorded in the audit log, so that ordinary users cannot bypass the renewal window and mass events stay reviewable.",User Stories,,"TC-06, TC-07, TC-08, TC-09",4,,,"Couverte via FR-8, FR-9"
+US-5,US,"As an RA Operator, I want the renewed certificate to keep its third-party technical metadata, so that it redeploys to the same location (for example the same F5 partition).",User Stories,,TC-02,1,,,Couverte via FR-3
+FR-1,FR,An authorized operator can renew a managed certificate whose current time is before its renewal period.,Functional Requirements,US-1,"TC-01, TC-12",2,P1,"horizon/app/models/webra/WebRARenewRequest.scala:753
+horizon/app/models/webra/WebRARenewRequest.scala:759
+horizon/app/models/error/webra/WebRARenewError.scala:11",Couverte
+FR-2,FR,"Early renewal reissues the certificate on its current profile and PKI connector, following standard renew semantics (same DN, SAN, extensions, labels, metadata; only the key may change).",Functional Requirements,US-1,"TC-01, TC-12",2,P1,horizon/app/models/webra/WebRARenewRequest.scala:984,Couverte
+FR-3,FR,"The renewed certificate retains the previous certificate's third-party technical metadata, so redeployment targets the same location.",Functional Requirements,US-5,TC-02,1,P1,"horizon/app/models/certificate/Certificate.scala:78
+horizon/app/models/certificate/Certificate.scala:173
+horizon/app/models/webra/WebRARenewRequest.scala:994",Couverte
+FR-4,FR,An operator can select several certificates in the certificate inventory (RA) and in My Certificates and renew them in one action.,Functional Requirements,US-2,TC-04,1,P1,"horizon-ui/src/pages/webra/lifecycle/certificates/my/MyCertificates.vue:160
+horizon-ui/src/pages/webra/lifecycle/certificates/search/SearchCertificates.vue
+horizon-ui/src/pages/webra/lifecycle/certificates/revoke/BulkMultipleRevocationPopup.vue",Couverte
+FR-5,FR,"Early renewal is available through the REST API, for a single certificate and for multiple certificates.",Functional Requirements,US-3,TC-03,1,P1,horizon/app/controllers/api/request/RequestController.scala:56,Couverte
+FR-6,FR,"In a bulk early renewal, each certificate is processed independently: a failure on one does not stop the others, and per-certificate outcomes are reported.",Functional Requirements,US-2,"TC-04, TC-11",2,P1,,Couverte
+FR-7,FR,"Early renewal overrides only the renewal-period check; validity and status checks (revoked, expired, renewal not enabled on the profile) still apply and reject ineligible certificates.",Functional Requirements,US-1,TC-05,1,P1,"horizon/app/models/webra/WebRARenewRequest.scala:766
+horizon/app/models/webra/WebRARenewRequest.scala:293",Couverte
+FR-8,FR,Early renewal is restricted to authorized operators and is not part of end-user self-service renewal.,Functional Requirements,US-4,"TC-06, TC-07, TC-08",3,P1,"horizon/app/models/certificate/profile/CertificateProfile.scala:188
+horizon/app/models/security/permission/LifecyclePermission.scala:36
+horizon-ui/src/pages/webra/lifecycle/certificates/my/MyCertificates.vue:1002",Couverte
+FR-9,FR,An early renewal is identifiable in the audit log (LIFECYCLE-RENEW) as having occurred outside the renewal period.,Functional Requirements,US-4,TC-09,1,P1,horizon/app/models/event/EventCode.scala:831,Couverte
+AC-1,AC,"Managed certificate outside its renewal period and an authorized operator: a new certificate is issued on the same profile and PKI connector, the previous certificate follows standard renew handling, and the new certificate carries the previous certificate's third-party technical metadata.",Acceptance Criteria,"FR-1, FR-2, FR-3","TC-01, TC-02",2,P1,,Couverte
+AC-2,AC,"Bulk selection containing a revoked certificate: eligible certificates are renewed, the revoked one is rejected with a per-certificate reason, and successful renewals are not rolled back.",Acceptance Criteria,FR-6,TC-04,1,P1,,Couverte
+AC-3,AC,A user without the early-renewal capability attempting to renew outside the window is rejected and the certificate is not renewed.,Acceptance Criteria,FR-8,TC-06,1,P1,,Couverte
+AC-4,AC,"An expired or revoked certificate is rejected on validity or status grounds, not on the renewal-period check, when an authorized operator attempts early renewal.",Acceptance Criteria,FR-7,TC-05,1,P1,,Couverte
+AC-5,AC,"After an early renewal, the LIFECYCLE-RENEW audit event indicates the renewal occurred outside the renewal period.",Acceptance Criteria,FR-9,TC-09,1,P1,,Couverte
+ACT-1,ACT,"Renew a single certificate early: RA Operator, Business administrator, Service principal (API); not available to end-user self-service. Enforcement mechanism open.","UX / UI, Roles & permissions",,"TC-01, TC-03, TC-06",3,P1,horizon/app/models/certificate/profile/CertificateProfile.scala:188,Couverte
+ACT-2,ACT,"Bulk early renewal from RA / My Certificates: RA Operator, Business administrator; per-certificate authorization applies.","UX / UI, Roles & permissions",,TC-04,1,P1,,Couverte
+ACT-3,ACT,"Approve an early renewal: RA Operator (approver), only if the approval-based model is chosen.","UX / UI, Roles & permissions",,TC-08,1,P2,"horizon/app/models/certificate/profile/CertificateProfile.scala:205
+horizon/app/models/security/permission/LifecyclePermission.scala:39",Couverte
+NFR-1,NFR,"Backward compatibility: in-window renewal, automatic renewal and self-service renewal are unchanged; early renewal is additive.",Non-Functional Requirements,,TC-07,1,P1,,Couverte
+NFR-2,NFR,Performance: bulk early renewal handles selections of the order of hundreds of certificates without blocking the operator; asynchronous processing is acceptable.,Non-Functional Requirements,,TC-11,1,P3,,Couverte
+NFR-3,NFR,"Security: early renewal is a privileged action, every early renewal is audited and identifiable as out-of-window, and tenant isolation applies.",Non-Functional Requirements,,"TC-09, TC-10",2,P1,,Couverte
+NFR-4,NFR,"Configuration: no new HOCON configuration; early renewal is a per-request action, not a global toggle.",Non-Functional Requirements,,TC-07,1,P1,,Couverte

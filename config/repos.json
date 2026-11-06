@@ -1,0 +1,105 @@
+{
+  "_comment": "Chemins relatifs au dossier qa-trace. status=local : cloné ; status=to-clone : à cloner à côté de qa-trace (gh repo clone). Ne jamais lire openssl/ : fixtures contenant des clés privées.",
+  "repos": [
+    {
+      "id": "horizon-core",
+      "product": "Horizon",
+      "kind": "server",
+      "path": "../horizon",
+      "github": "evertrust/horizon",
+      "status": "local",
+      "description": "Serveur Horizon (Scala/sbt) : PKI, CLM, DCV, authentification, API REST (dossier openapi/). Source de verite du comportement produit.",
+      "scope_labels": [
+        "Horizon-Core",
+        "PKI module",
+        "CLM module",
+        "DCV module"
+      ]
+    },
+    {
+      "id": "horizon-ui",
+      "product": "Horizon",
+      "kind": "frontend",
+      "path": "../horizon-ui",
+      "github": "evertrust/horizon-ui",
+      "status": "local",
+      "description": "Interface web Horizon (Vue/Quasar) avec ses tests e2e Playwright (e2e/) et sa doc (docs/). Pages, formulaires, messages d'erreur visibles par l'utilisateur.",
+      "scope_labels": [
+        "Horizon-Core",
+        "PKI module",
+        "CLM module",
+        "DCV module"
+      ]
+    },
+    {
+      "id": "stream-core",
+      "product": "Stream",
+      "kind": "server",
+      "path": "../stream",
+      "github": "evertrust/stream",
+      "status": "local",
+      "description": "Serveur Stream (Scala/sbt) : backend et API. Source de verite du comportement Stream.",
+      "scope_labels": [
+        "Stream"
+      ]
+    },
+    {
+      "id": "horizon-cli",
+      "product": "Horizon",
+      "kind": "client",
+      "path": "../horizon-cli",
+      "github": "evertrust/horizon-cli",
+      "status": "local",
+      "description": "Client Go : binaire horizon-client et, avec le tag stream, stream-client. Commandes acme, est, scep, netscan, localscan, webra, automate, updatecert, etc. Consomme l'API Horizon et l'API Stream.",
+      "scope_labels": [
+        "Horizon-CLI"
+      ]
+    },
+    {
+      "id": "horizon-e2e",
+      "product": "Horizon",
+      "kind": "e2e",
+      "path": "../horizon-e2e",
+      "github": "evertrust/horizon-e2e",
+      "status": "local",
+      "description": "Dépôt de tests end-to-end Horizon (quasi vide : un README et un commit initial). Rien à analyser pour l'instant.",
+      "scope_labels": []
+    },
+    {
+      "id": "stream-e2e",
+      "product": "Stream",
+      "kind": "e2e",
+      "path": "../stream-e2e",
+      "github": "evertrust/stream-e2e",
+      "status": "local",
+      "description": "Tests e2e Playwright de Stream (UI et API, conteneurs Docker). Sert à connaître les parcours déjà testés et les conventions (doc/ et tests/specs). Les tests existants évitent les doublons.",
+      "scope_labels": [
+        "Stream"
+      ]
+    }
+  ],
+  "ignored": [
+    {
+      "path": "../openssl",
+      "reason": "fixtures de certificats et clés privées : ne jamais lire ni indexer"
+    }
+  ],
+  "scope_label_notes": {
+    "Horizon-ONE": "Pas de repo local : à ajouter si besoin",
+    "Satellite": "Pas de repo local",
+    "WinHorizon": "Pas de repo local",
+    "Ansible Collection": "Pas de repo local",
+    "Terraform Provider": "Pas de repo local",
+    "Kubernetes Cert-Manager": "Pas de repo local (horizon-issuer)"
+  },
+  "skip_dirs": [
+    ".git",
+    "node_modules",
+    "vendor",
+    "playwright-report",
+    "blob-report",
+    "__snapshot__",
+    "dist",
+    "build"
+  ]
+}

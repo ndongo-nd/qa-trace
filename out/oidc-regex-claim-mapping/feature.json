@@ -1,0 +1,732 @@
+{
+  "slug": "oidc-regex-claim-mapping",
+  "title": "Support regex matching for OIDC claim-to-Role/Team mapping",
+  "spec_file": "test.md",
+  "release": "Horizon 2.12.0",
+  "repos": [
+    "horizon",
+    "horizon-ui"
+  ],
+  "explanation": {
+    "summary": "Horizon associe les valeurs d'un claim OIDC (par exemple la liste des groupes d'un utilisateur) a des Roles et des Teams. Jusqu'en 2.10, chaque valeur devait etre declaree dans une entree distincte, avec une egalite stricte. Cette fonctionnalite ajoute, par entree, un type de correspondance : Static (comportement actuel, egalite exacte) ou Regex (la valeur doit satisfaire l'expression reguliere sur toute sa longueur). Une seule entree peut ainsi couvrir tous les sous-groupes d'une arborescence. Lorsque plusieurs entrees correspondent a une valeur, l'utilisateur recoit l'union de leurs Roles et Teams.",
+    "ecosystem_role": "Le mapping de claims se situe au moment de la connexion : l'IdP externe (Keycloak, Entra ID, Okta...) emet un jeton contenant les groupes de l'utilisateur, Horizon-Core en extrait les valeurs, les compare aux entrees du mapping configure sur le fournisseur d'identite OIDC du tenant, et en deduit les Roles et Teams de la session. Ces Roles et Teams determinent ensuite ce que l'utilisateur peut faire (demander, renouveler, approuver, administrer) sur tous les modules. La fonctionnalite concerne le coeur de la plateforme (pas un module de licence pki, clm ou dcv). Le persona principal est l'administrateur metier, qui configure le mapping. Les comptes de service et le fournisseur d'identite local ne sont pas touches.",
+    "example": [
+      "Camille, administratrice metier, configure le fournisseur OIDC du tenant dans Security, Access Management, Identity providers. Son annuaire contient les groupes app-team-frontend, app-team-backend et app-team-platform.",
+      "Avant 2.12, Camille devait creer trois entrees identiques, une par groupe, et en ajouter une a chaque nouveau sous-groupe.",
+      "Avec 2.12, elle ajoute une seule entree, choisit le type Regex, saisit la valeur app-team-.* et selectionne la Team Dev-Certificats.",
+      "Elle enregistre. Horizon verifie que l'expression est valide ; si elle avait saisi app-team-[, l'enregistrement serait refuse avec un message citant l'entree fautive.",
+      "Karim se connecte. Son jeton contient le groupe app-team-backend. Horizon compare la valeur a l'expression sur toute sa longueur : elle correspond, Karim obtient la Team Dev-Certificats.",
+      "Le mois suivant, l'IdP cree le groupe app-team-security. Sans aucune action de Camille, un utilisateur de ce groupe obtient la meme Team a sa prochaine connexion.",
+      "Un utilisateur du groupe x-app-team-frontend n'obtient rien : la correspondance porte sur la valeur entiere, pas sur un fragment."
+    ],
+    "limits": [
+      "Une entree Regex cible uniquement des Roles et Teams existants et nommes explicitement ; le nom du Role ou de la Team ne peut pas etre deduit du texte capture.",
+      "Pas de syntaxe glob (un simple *) : uniquement des expressions regulieres.",
+      "Aucun changement a la regle d'extraction des valeurs, au fournisseur local, ni aux regles de claims des comptes de service.",
+      "Un motif trop large peut sur-attribuer des droits : la validation a l'enregistrement controle la syntaxe, pas la pertinence metier du motif."
+    ]
+  },
+  "requirements": [
+    {
+      "id": "US-1",
+      "type": "US",
+      "text": "As a Business administrator, I want to match OIDC claim values with a regular expression in a mapping entry, so that one rule covers all matching subgroups.",
+      "source": "User Stories"
+    },
+    {
+      "id": "US-2",
+      "type": "US",
+      "text": "As a Business administrator, I want to choose Static or Regex per entry, so that existing exact-match mappings keep working unchanged.",
+      "source": "User Stories"
+    },
+    {
+      "id": "US-3",
+      "type": "US",
+      "text": "As a Business administrator, I want an invalid regex rejected when I save, so that a broken pattern never silently denies or over-grants access.",
+      "source": "User Stories"
+    },
+    {
+      "id": "US-4",
+      "type": "US",
+      "text": "As an End user, I want my Roles and Teams resolved correctly from my group claims at login, so that a new subgroup gives the right access with no admin action.",
+      "source": "User Stories"
+    },
+    {
+      "id": "FR-1",
+      "type": "FR",
+      "text": "A Business administrator can set each claim mapping entry's match type to Static or Regex; a new entry defaults to Static.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-2"
+      ],
+      "code": [
+        "horizon-ui/src/components/horizonConf/common/identityProviders/ClaimMapping.vue:75",
+        "horizon/app/models/security/identity/provider/oidc/ClaimMappingEntry.scala:9"
+      ]
+    },
+    {
+      "id": "FR-2",
+      "type": "FR",
+      "text": "For a Regex entry, Horizon grants the entry's Roles and Teams when an extracted claim value matches the pattern over its whole length.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-1",
+        "US-4"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22"
+      ]
+    },
+    {
+      "id": "FR-3",
+      "type": "FR",
+      "text": "A Static entry keeps matching by exact string equality, unchanged.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-2"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22",
+        "horizon/test/security/OidcClaimMappingSpec.scala:19"
+      ]
+    },
+    {
+      "id": "FR-4",
+      "type": "FR",
+      "text": "When a claim value matches several entries, Horizon grants the union of all matched entries' Roles and Teams.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-1"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:23",
+        "horizon/test/security/OidcClaimMappingSpec.scala:28"
+      ]
+    },
+    {
+      "id": "FR-5",
+      "type": "FR",
+      "text": "Regex matching is case-sensitive; case-insensitive matching is expressed with inline regex flags.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-1"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22"
+      ]
+    },
+    {
+      "id": "FR-6",
+      "type": "FR",
+      "text": "Horizon validates a Regex entry's pattern when the OIDC provider is saved and rejects the save with a clear error naming the offending entry.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-3"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:147",
+        "horizon/app/models/security/identity/provider/codec/DynamicIdentityProviderCodec.scala:37"
+      ]
+    },
+    {
+      "id": "FR-7",
+      "type": "FR",
+      "text": "A Regex entry references only existing Roles and Teams, validated at save time as today.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-2"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:170",
+        "horizon/test/security/OidcIdentityProviderSpec.scala"
+      ]
+    },
+    {
+      "id": "FR-8",
+      "type": "FR",
+      "text": "The extended claim mapping is included in configuration import / export.",
+      "source": "Functional Requirements",
+      "derived_from": [
+        "US-2"
+      ],
+      "code": [
+        "horizon/app/models/configuration/ExportableItems.scala:198",
+        "horizon/app/models/security/identity/provider/codec/DynamicIdentityProviderCodec.scala:36"
+      ]
+    },
+    {
+      "id": "AC-1",
+      "type": "AC",
+      "text": "Regex entry app-team-.* mapped to Team X; login with app-team-frontend and app-team-backend grants Team X.",
+      "source": "Acceptance Criteria",
+      "derived_from": [
+        "FR-2"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22"
+      ]
+    },
+    {
+      "id": "AC-2",
+      "type": "AC",
+      "text": "Invalid pattern app-team-[ is rejected on save with an error naming the entry; mapping not persisted.",
+      "source": "Acceptance Criteria",
+      "derived_from": [
+        "FR-6"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:147"
+      ]
+    },
+    {
+      "id": "AC-3",
+      "type": "AC",
+      "text": "Static entry admin -> Role A and Regex entry admin.* -> Role B; login with admin grants both roles.",
+      "source": "Acceptance Criteria",
+      "derived_from": [
+        "FR-4"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22"
+      ]
+    },
+    {
+      "id": "AC-4",
+      "type": "AC",
+      "text": "Regex entry team-.* mapped to Team Y; value x-team-frontend does not match, Team Y not granted.",
+      "source": "Acceptance Criteria",
+      "derived_from": [
+        "FR-2"
+      ],
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22"
+      ]
+    },
+    {
+      "id": "AC-5",
+      "type": "AC",
+      "text": "Mapping saved before upgrade with exact-match entries: after upgrade every entry is Static and resolution is identical to 2.10.",
+      "source": "Acceptance Criteria",
+      "derived_from": [
+        "FR-3"
+      ],
+      "code": [
+        "horizon/test/security/ClaimMappingEntrySpec.scala"
+      ]
+    },
+    {
+      "id": "ACT-1",
+      "type": "ACT",
+      "text": "Configuring the OIDC provider claim mapping, including regex entries, is permitted to the Business administrator using the existing Identity Provider management permission; no new permission.",
+      "source": "UX / UI, Roles & permissions",
+      "code": [
+        "horizon/app/controllers/security/openid/OpenIdController.scala:144"
+      ]
+    },
+    {
+      "id": "NFR-1",
+      "type": "NFR",
+      "text": "Backward compatibility: stored mappings load unchanged, every existing entry is Static, no data migration beyond defaulting.",
+      "source": "Non-Functional Requirements",
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/ClaimMappingEntry.scala:9",
+        "horizon/packaging/migration"
+      ]
+    },
+    {
+      "id": "NFR-2",
+      "type": "NFR",
+      "text": "Regex evaluation must be safe against pathological input (ReDoS guard, approach still an open question).",
+      "source": "Non-Functional Requirements; Technical Open Questions #1",
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:22"
+      ]
+    },
+    {
+      "id": "NFR-3",
+      "type": "NFR",
+      "text": "Saving the provider emits the existing audit event SEC-IDENTITY-PROVIDER-UPDATE; no new event type.",
+      "source": "Non-Functional Requirements",
+      "code": [
+        "horizon/app/models/event/EventCode.scala:629"
+      ]
+    },
+    {
+      "id": "NFR-4",
+      "type": "NFR",
+      "text": "Mapping is stored per tenant in the identity providers configuration; the Match type control is not expert-mode only.",
+      "source": "Non-Functional Requirements; UX / UI",
+      "code": [
+        "horizon-ui/src/pages/horizonConf/security/accessMgmt/identityProviders/AddEditIdentityProvider.vue"
+      ]
+    },
+    {
+      "id": "NFR-5",
+      "type": "NFR",
+      "text": "Existing synchronization modes (roles_teams, roles, teams) keep their semantics with Regex entries (not in the spec, present in the code).",
+      "source": "Code: OidcClaimMapping.scala, OidcIdentityProvider.scala",
+      "code": [
+        "horizon/app/models/security/identity/provider/oidc/OidcClaimMapping.scala:24",
+        "horizon/app/models/security/identity/provider/oidc/OidcIdentityProvider.scala:160"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "id": "TC-01",
+      "title": "Regex entry grants Team to matching subgroups, including a new one",
+      "req": [
+        "AC-1",
+        "FR-2",
+        "US-1",
+        "US-4"
+      ],
+      "type": "Functional",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Resolution",
+      "tags": [
+        "happy-path"
+      ],
+      "preconditions": "OIDC provider with Regex entry app-team-.* mapped to Team X, mode roles_teams. Three test users in the IdP, in groups app-team-frontend, app-team-backend and none of them yet in app-team-security.",
+      "steps": [
+        [
+          "Log in as the user in group app-team-frontend",
+          "Login succeeds; the user is a member of Team X"
+        ],
+        [
+          "Log in as the user in group app-team-backend",
+          "The user is a member of Team X"
+        ],
+        [
+          "On the IdP, create group app-team-security, add the third user, then log in without changing anything in Horizon",
+          "The user is a member of Team X"
+        ]
+      ]
+    },
+    {
+      "id": "TC-02",
+      "title": "Matching rules: whole value, case sensitivity, inline flag",
+      "req": [
+        "AC-4",
+        "FR-2",
+        "FR-5"
+      ],
+      "type": "Functional",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Resolution",
+      "tags": [
+        "edge-case"
+      ],
+      "preconditions": "Regex entries: team-.* -> Team Y, App-Team-.* -> Team X, (?i)ops-.* -> Team Z, app-team -> Team W. One test user per claim value below.",
+      "steps": [
+        [
+          "Log in with claim value x-team-frontend",
+          "Team Y is not granted (no substring match)"
+        ],
+        [
+          "Log in with claim value team-frontend",
+          "Team Y is granted"
+        ],
+        [
+          "Log in with claim value app-team-frontend",
+          "Team X is not granted (case-sensitive) and Team W is not granted (trailing characters)"
+        ],
+        [
+          "Log in with claim value App-Team-frontend",
+          "Team X is granted"
+        ],
+        [
+          "Log in with claim value OPS-Frontend",
+          "Team Z is granted (inline flag (?i))"
+        ]
+      ]
+    },
+    {
+      "id": "TC-03",
+      "title": "Static and Regex entries coexist, union of Roles and Teams",
+      "req": [
+        "AC-3",
+        "FR-3",
+        "FR-4",
+        "FR-2"
+      ],
+      "type": "Functional",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Resolution",
+      "tags": [
+        "edge-case"
+      ],
+      "preconditions": "Static entry admin -> Role A. Regex entries admin.* -> Role B and .*-backend -> Team Y. Static entry app-.* -> Team Z (regex characters must be literal).",
+      "steps": [
+        [
+          "Log in with claim value admin",
+          "The user holds Role A and Role B"
+        ],
+        [
+          "Log in with claim value admin2",
+          "The user holds Role B only (static entry is an exact match)"
+        ],
+        [
+          "Log in with claim values admin and app-backend",
+          "The user holds Role A, Role B and Team Y (union across entries)"
+        ],
+        [
+          "Log in with claim value app-frontend, then with the literal value app-.*",
+          "Team Z is not granted for app-frontend (static, literal); Team Z is granted for the literal value"
+        ],
+        [
+          "Log in with claim value marketing",
+          "No Role or Team is granted by the mapping"
+        ]
+      ]
+    },
+    {
+      "id": "TC-04",
+      "title": "Invalid regex is rejected on save (UI and API)",
+      "req": [
+        "AC-2",
+        "FR-6",
+        "US-3"
+      ],
+      "type": "Functional",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Validation",
+      "tags": [
+        "error-case"
+      ],
+      "preconditions": "OIDC provider edit page open, valid configuration saved beforehand. API credentials of a Business administrator.",
+      "steps": [
+        [
+          "In the UI, add a Regex entry with value app-team-[ and Team X, then save",
+          "Save is blocked with an error that names the offending entry"
+        ],
+        [
+          "Reload the provider",
+          "The invalid entry is not persisted; the previous configuration is unchanged"
+        ],
+        [
+          "Add a valid Regex entry app-team-.* then an invalid one (admin (second entry), and save",
+          "The error designates the second entry, not the first"
+        ],
+        [
+          "Send the same invalid pattern through the provider update API",
+          "Request is rejected with a client error naming the entry; configuration unchanged"
+        ],
+        [
+          "Add a Regex entry with an empty value and save [needs clarification]",
+          "Behaviour to be defined: rejection or acceptance (Open Question 2)"
+        ]
+      ]
+    },
+    {
+      "id": "TC-05",
+      "title": "Reference rules on Roles and Teams still apply to Regex entries",
+      "req": [
+        "FR-7"
+      ],
+      "type": "Functional",
+      "priority": "P2",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Validation",
+      "tags": [
+        "error-case",
+        "api"
+      ],
+      "preconditions": "API credentials of a Business administrator. Role ghost-role and Team ghost-team do not exist. Role A and Team X exist.",
+      "steps": [
+        [
+          "Update the provider with Regex entry app-.* targeting ghost-role",
+          "Rejected: Role(s) referenced in claim mapping do not exist"
+        ],
+        [
+          "Update the provider with Regex entry app-.* targeting ghost-team",
+          "Rejected: Team(s) referenced in claim mapping do not exist"
+        ],
+        [
+          "Update the provider with Regex entry app-.* with neither Role nor Team",
+          "Rejected: an entry must contain at least one role or team"
+        ],
+        [
+          "Set mode roles and add a Regex entry targeting Team X",
+          "Rejected: entries must not reference teams when the mode is roles"
+        ],
+        [
+          "Save a valid Regex entry app-.* -> Role A and Team X, then try to delete Role A and Team X",
+          "Both deletions are refused because they are referenced by the OIDC claim mapping"
+        ]
+      ]
+    },
+    {
+      "id": "TC-06",
+      "title": "Match type control in the UI",
+      "req": [
+        "FR-1",
+        "NFR-4",
+        "FR-3"
+      ],
+      "type": "Usability",
+      "priority": "P2",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / UI",
+      "tags": [
+        "ui"
+      ],
+      "preconditions": "Business administrator logged in, expert mode disabled, OIDC provider edit page open with one Static entry app-team-.* -> Team X.",
+      "steps": [
+        [
+          "Add a new claim mapping entry",
+          "Match type is preselected to Static; the control is visible outside expert mode"
+        ],
+        [
+          "Select Regex on the new entry",
+          "Helper text explains the value is a regular expression and shows an example such as app-team-.*"
+        ],
+        [
+          "Save, reload the page",
+          "The entry keeps the Regex match type and its value"
+        ],
+        [
+          "Switch the first entry from Static to Regex, save, and log in with app-team-frontend",
+          "Team X is granted; with the entry set back to Static, it is not"
+        ]
+      ]
+    },
+    {
+      "id": "TC-07",
+      "title": "Synchronization modes apply to Regex entries",
+      "req": [
+        "NFR-5",
+        "FR-2"
+      ],
+      "type": "Functional",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Synchronization mode",
+      "tags": [
+        "edge-case"
+      ],
+      "preconditions": "Regex entry app-.* -> Role A and Team X. Test user already holding Role B and Team Z (set manually).",
+      "steps": [
+        [
+          "Set mode roles, log in with claim app-frontend",
+          "Role A granted; Team X not granted; Team Z kept"
+        ],
+        [
+          "Set mode teams, log in with the same claim",
+          "Team X granted; Role B kept"
+        ],
+        [
+          "Set mode roles_teams, log in with the same claim, then remove the user from the IdP group and log in again",
+          "After the first login the user has Role A and Team X; after the second the mapped Roles and Teams are removed (Replace)"
+        ]
+      ]
+    },
+    {
+      "id": "TC-08",
+      "title": "Existing mappings unchanged after upgrade, and old exports import as Static",
+      "req": [
+        "AC-5",
+        "NFR-1",
+        "FR-3",
+        "FR-8"
+      ],
+      "type": "Regression",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Upgrade",
+      "tags": [
+        "upgrade"
+      ],
+      "preconditions": "Horizon 2.10 or 2.11 with exact-match entries (admin -> Role A, finance -> Team Y) and a configuration export from that version, then upgrade to 2.12.0.",
+      "steps": [
+        [
+          "After the upgrade, open the claim mapping",
+          "Every existing entry shows Match type Static; values and targets unchanged"
+        ],
+        [
+          "Log in with claims admin and finance",
+          "Role A and Team Y are granted exactly as before the upgrade"
+        ],
+        [
+          "Import the old configuration export into a clean 2.12.0 tenant",
+          "Import succeeds; all entries are Static"
+        ]
+      ]
+    },
+    {
+      "id": "TC-09",
+      "title": "Configuration export and import preserve Regex entries",
+      "req": [
+        "FR-8"
+      ],
+      "type": "Functional",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Import-Export",
+      "tags": [
+        "import-export"
+      ],
+      "preconditions": "Provider with one Static and one Regex entry (app-team-.* -> Team X). A clean target tenant.",
+      "steps": [
+        [
+          "Export the configuration",
+          "The OIDC Identity Provider contains the match type of both entries, Regex marked as such"
+        ],
+        [
+          "Import the export into the clean tenant",
+          "Import succeeds"
+        ],
+        [
+          "Open the provider and log in with app-team-frontend",
+          "The Regex entry is present and effective; Team X is granted"
+        ]
+      ]
+    },
+    {
+      "id": "TC-10",
+      "title": "Access control on claim mapping configuration",
+      "req": [
+        "ACT-1"
+      ],
+      "type": "Security",
+      "priority": "P1",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Permissions",
+      "tags": [
+        "permissions"
+      ],
+      "preconditions": "One user with the Identity Provider management permission, one without.",
+      "steps": [
+        [
+          "As the authorized user, add and save a Regex entry (UI)",
+          "Save succeeds"
+        ],
+        [
+          "As the other user, open the identity provider page and send an update with a Regex entry via the API",
+          "Edition is not possible in the UI; the API refuses the request"
+        ],
+        [
+          "Compare the permission list with 2.11",
+          "No permission related to claim mapping or regex has been added"
+        ]
+      ]
+    },
+    {
+      "id": "TC-11",
+      "title": "Audit event on save",
+      "req": [
+        "NFR-3"
+      ],
+      "type": "Functional",
+      "priority": "P2",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Audit",
+      "tags": [
+        "audit"
+      ],
+      "preconditions": "Access to the audit events.",
+      "steps": [
+        [
+          "Save the provider with a Regex entry",
+          "One SEC-IDENTITY-PROVIDER-UPDATE event is recorded"
+        ],
+        [
+          "Look for any new event type tied to the action",
+          "No new event type exists"
+        ]
+      ]
+    },
+    {
+      "id": "TC-12",
+      "title": "Claim mapping is isolated per tenant",
+      "req": [
+        "NFR-4"
+      ],
+      "type": "Functional",
+      "priority": "P2",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Tenants",
+      "tags": [],
+      "preconditions": "Two tenants; tenant A has Regex entry app-.* -> Team X, tenant B has none.",
+      "steps": [
+        [
+          "As root tenant administrator, open the provider of each tenant",
+          "Each tenant shows only its own entries"
+        ],
+        [
+          "Log in on tenant B with claim app-frontend",
+          "Team X is not granted"
+        ]
+      ]
+    },
+    {
+      "id": "TC-13",
+      "title": "Service Accounts and Local provider unaffected",
+      "req": [
+        "FR-3"
+      ],
+      "type": "Regression",
+      "priority": "P2",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Out of scope regression",
+      "tags": [
+        "regression"
+      ],
+      "preconditions": "OIDC provider with Service Account claim rules as in 2.11 plus a Regex entry. A local user with Roles and Teams.",
+      "steps": [
+        [
+          "Authenticate a Service Account that satisfies the claim rules, then one that does not",
+          "Accepted and refused exactly as in 2.11"
+        ],
+        [
+          "Log in with the local user",
+          "Roles and Teams are those of the local user, unchanged"
+        ]
+      ]
+    },
+    {
+      "id": "TC-14",
+      "title": "Pathological regex and many entries do not degrade login",
+      "req": [
+        "NFR-2"
+      ],
+      "type": "Performance",
+      "priority": "P3",
+      "automation": "Manual",
+      "folder": "OIDC claim mapping / Performance",
+      "tags": [
+        "needs-clarification"
+      ],
+      "preconditions": "Regex entry (a+)+$ saved (acceptance by validation is itself unspecified). A provider variant with 100 Regex entries and a user with 50 group values.",
+      "steps": [
+        [
+          "Log in with a claim of 40 characters a followed by !",
+          "Login ends within a bounded time and the server stays responsive; exact limit to define (Open Question 1)"
+        ],
+        [
+          "Measure login time on the 100-entry provider, and compare with 100 Static entries",
+          "The difference is acceptable; threshold to be defined by the team"
+        ]
+      ]
+    }
+  ],
+  "open_questions": [
+    "ReDoS : quel mecanisme (timeout d'evaluation, moteur lineaire, limite de longueur du motif) et quelle limite ? (Technical Open Question 1 de la spec). Conditionne TC-14.",
+    "Valeur de regex vide : rejet a l'enregistrement ou acceptation ? La spec ne le precise pas (TC-04).",
+    "Dialecte de regex (Java, RE2, JavaScript) non precise : conditionne la syntaxe acceptee (flags inline, lookahead, classes Unicode).",
+    "Seuils de performance au login non definis (TC-14).",
+    "Mode de synchronisation : la spec ne le mentionne pas ; confirmer que le comportement Replace s'applique a l'identique aux entrees Regex (NFR-5)."
+  ],
+  "findings": [
+    "Le code (OidcClaimMapping.scala:22) fait une egalite stricte sur entry.claim : aucune notion de type de correspondance n'existe encore. La fonctionnalite est donc entierement a creer, la spec decrit bien l'etat actuel (comportement 'Static').",
+    "Le code contient un mode de synchronisation (synchronizationMode : roles_teams, roles, teams) absent de la spec. En mode Replace, un utilisateur qui ne correspond plus a aucune entree perd ses Roles/Teams ; en mode roles, les entrees ne peuvent referencer aucune Team (et inversement). Les tests regex doivent couvrir ces modes (TC-07, NFR-5).",
+    "Une entree doit referencer au moins un Role ou une Team (ClaimMappingEntry.scala) et 'mapping.entries' ne peut pas etre vide : cas limites a tester avec Regex (TC-05).",
+    "Un Role ou une Team reference par une entree du mapping ne peut pas etre supprime (Role.scala:108, Team.scala:118). Ce garde-fou doit aussi valoir pour les entrees Regex (TC-05).",
+    "Les erreurs de validation existantes (Role(s)/Team(s) referenced in claim mapping do not exist) citent les noms manquants mais pas l'entree ; la spec exige que l'erreur de regex nomme l'entree fautive (FR-6). Format du message a definir.",
+    "Le dialecte de regex n'est pas fixe par la spec ; horizon etant en Scala/JVM, java.util.regex est le candidat naturel (a confirmer avec le Backend)."
+  ]
+}

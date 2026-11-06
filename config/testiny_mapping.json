@@ -1,0 +1,29 @@
+{
+  "delimiter": ",",
+  "folder_separator": " > ",
+  "template": "STEPS",
+  "columns": [
+    {"header": "parent_folder_name", "field": "folder"},
+    {"header": "title", "field": "title_full"},
+    {"header": "template", "field": "template"},
+    {"header": "precondition", "field": "preconditions"},
+    {"header": "steps", "field": "steps_text"},
+    {"header": "expected_results", "field": "expected_text"},
+    {"header": "priority", "field": "priority"},
+    {"header": "testcase_type", "field": "type"},
+    {"header": "automation", "field": "automation"}
+  ],
+  "priority_map": {"P1": "1", "P2": "2", "P3": "3"},
+  "type_map": {
+    "Functional": "FUNCTIONAL",
+    "Regression": "REGRESSION",
+    "Security": "SECURITY",
+    "Performance": "PERFORMANCE",
+    "Usability": "USABILITY"
+  },
+  "automation_map": {
+    "Manual": "NOT_AUTOMATED",
+    "Automatable": "NOT_AUTOMATED",
+    "Automated": "AUTOMATED"
+  }
+}
